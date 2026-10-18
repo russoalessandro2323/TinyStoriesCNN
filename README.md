@@ -40,9 +40,9 @@ Dataloader: ogni batch è composto da 16 storie di lunghezza variabile.
 # Loss function 
 - nn.CrossEntropyLoss,
 - y_true equivale alla frase di input traslata di una posizione a sinistra <br>
-  ["\<NWS\>", "Ciao", ",", "questa", "è", "una", "frase", "di"] -> ["Ciao",      ","  "questa", "è", "una", "frase", "di", "esempio"]).
+  ["\<NWS\>", "Ciao", ",", "questa", "è", "una", "frase", "di"] -> ["Ciao",      ",",  "questa", "è", "una", "frase", "di", "esempio"]).
 - It also ignores all the \<PAD\> tokens
-- 
+  
 # Optimizer 
 - torch.optim.AdamW(model.parameters(), lr=0.001)
   
