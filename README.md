@@ -13,10 +13,10 @@ Dataloader: ogni batch è composto da 16 storie di lunghezza variabile.
 - Pulizia del dataset tramite gestione dei mojibake, presenti nel dataset di partenza
 - Creazione dei token con gestione della punteggiatura, un token equivale ad una parola. (e.g. "Ciao, questa è una frase di esempio" -> ["Ciao", ",", "questa", "è", "una", "frase", "di", "esempio"]).
 - Creazione dei dizionari di encoding (word2idx, {token: index)) e di decoding (idx2word, {index: token})
-- Creazione del dizionario completo vocab.json, contenente parole aventi frequenza maggiore della threshold.
+- Creazione del dizionario completo vocab.json, contenente parole aventi frequenza >= threshold.
 - Calcolo del parametro L, lunghezza fissa alla quale tutte le frasi di ogni batch verranno formattate (95 percentile).
 - Ogni batch avrà una shape corrispondente a (Batch_size, L).
-- Gestione di tag speciali come \<UNK\> (parola non presente nel dizionario), \<NWL\> ("\n"), \<NWS\> (tag presente all'inizio di ogni storia) e \<PAD\> (tag utilizzato perportare storie più brevi di L alla dimensione prefissata)
+- Gestione di tag speciali come \<UNK\> (parola non presente nel dizionario), \<NWL\> ("\n"), \<NWS\> (tag presente all'inizio di ogni storia) e \<PAD\> (tag utilizzato per portare storie più brevi di L alla dimensione prefissata)
 
 # Embedding table
 - Primo layer del modello, trasforma ogni parola del dizionario in un vettore 64-dimensionale, permettendo al modello di imparare relazioni tra le parole, come la similarità.
@@ -28,9 +28,10 @@ Dataloader: ogni batch è composto da 16 storie di lunghezza variabile.
 # Residual block
 - Nucleo del modello, composto da 7 residual blocks.
 - Ogni blocco è composto da 6 layers:
-  2 temporal convolutional layers con kernel 3x3 e fattore di dilatazione crescente. <br>
+  2 temporal convolutional layers con kernel di dimensione = 3 e fattore di dilatazione crescente. <br>
   2 ReLU activation layers <br> 
   2 Dropout layers con p = 0.1 <br>
+  più la skip connection finale x + F(x)
 - Ogni batch avrà una shape corrispondente a (Batch_size, n_kernels, L).
 
 # Convolutional1D 
@@ -38,14 +39,18 @@ Dataloader: ogni batch è composto da 16 storie di lunghezza variabile.
 
 # Loss function 
 - nn.CrossEntropyLoss,
-- y_true equivale alla frase di input traslata di una posizione a destra <br>
+- y_true equivale alla frase di input traslata di una posizione a sinistra <br>
   ["\<NWS\>", "Ciao", ",", "questa", "è", "una", "frase", "di"] -> ["Ciao",      ","  "questa", "è", "una", "frase", "di", "esempio"]).
-
+- It also ignores all the \<PAD\> tokens
+- 
+# Optimizer 
+- torch.optim.AdamW(model.parameters(), lr=0.001)
+  
 # Parametri
 - Batch_size = 16 <br>
 - Embedding_dim = 64 <br>
 - Vocab_size = 25.560 (f_threshold = 5) <br>
-- L = 460 <br>
+- L = 461 <br>
 - N_Res_Blocks = 7 (Final receptive field = 763, >> L) <br>
 - N_kernels = Embedding_dim = 64 <br>
 - Parametri totali del modello = 3.470.168 <br>
@@ -55,7 +60,7 @@ Dataloader: ogni batch è composto da 16 storie di lunghezza variabile.
 
 
 # Risultati ottenuti + Confronto con un modello LSTM
-In questa sezione confronteremo i risultati ottenuti con un secondo modello, un'architettura LSTM di pari dimensioni (3.330,520 parametri) ed allenati sullo stesso dataset con lo stesso numero di iterazioni.
+In questa sezione confronteremo i risultati ottenuti con un secondo modello, un'architettura LSTM di dimensione simile (3.330.520 parametri) ed allenato sullo stesso dataset con lo stesso numero di iterazioni.
 
 <img width="601" height="430" alt="image" src="https://github.com/user-attachments/assets/60f9982b-9f40-4f12-b22f-760421a1916a" />
 
@@ -65,7 +70,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
 --- CNN ---  
 
-<NWS> one day i was sitting on a bench . he had a lot of fun , so she asked his parents about it . 
+\<NWS\> one day i was sitting on a bench . he had a lot of fun , so she asked his parents about it . 
  
  the girl wanted to show them to the park to build a sandcastle to play . so , the little boy ' s face got to the park . he was so sad , but he kept playing with his hair . 
  
@@ -94,7 +99,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
  --- LSTM ---  
 
-<NWS> one day i was sitting on a bench , and he was playing in the garden . he saw a big , black animal with a fish inside . it was so old and furry on it was a little rabbit . 
+\<NWS\> one day i was sitting on a bench , and he was playing in the garden . he saw a big , black animal with a fish inside . it was so old and furry on it was a little rabbit . 
  
  the squirrel hopped inside and started jumping around the ground , through the air . he looked at the trees and saw that big , there was a big fish ! he swam closer and closer for a long time . inside , there was some rocks . she was amazed and wanted to see what he wanted . the squirrel was so happy and they hopped inside . 
  
@@ -124,7 +129,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
  --- CNN ---  
 
-<NWS> once upon a time , there was a little girl named lily . she loved to play with her toys and play . one day , she saw many animals around the garden when she saw a big , yellow bird . the butterfly flew up and landed on it . lily liked to make the nest on the ground . 
+\<NWS\> once upon a time , there was a little girl named lily . she loved to play with her toys and play . one day , she saw many animals around the garden when she saw a big , yellow bird . the butterfly flew up and landed on it . lily liked to make the nest on the ground . 
  
  lily started to cry . she wanted to play and make her home . the bear thought the butterfly was too big for her . 
  
@@ -140,7 +145,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
  --- LSTM ---  
 
-<NWS> once upon a time , there was a little girl named lily . she loved to play outside and explore . one day , she saw a big , brown bird in her nest . lily wanted to play with her friends , so she held onto her mittens tightly gently . 
+\<NWS\> once upon a time , there was a little girl named lily . she loved to play outside and explore . one day , she saw a big , brown bird in her nest . lily wanted to play with her friends , so she held onto her mittens tightly gently . 
  
  lily said , " yes , let ' s go find a nest . " lily nodded and said , " yes , we can sing a song together . " lily felt happy . 
  
@@ -162,7 +167,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
  --- CNN ---  
 
-<NWS> the dog ran to the park and saw a big hill . the tree was so high , but it was also very powerful . he wanted to be a princess ! 
+\<NWS\> the dog ran to the park and saw a big hill . the tree was so high , but it was also very powerful . he wanted to be a princess ! 
  
  tom wanted to help the bird , but he was too fast . he said he was just a bit embarrassed and tried to catch it . his parents told his parents a bit of a nice , friendly dog . 
  
@@ -184,7 +189,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
 
  --- LSTM ---  
 
-<NWS> the dog ran to the park and saw a big , black cat on the ground . it wanted to pick it up ! but then something strange happened . it was a trap , so he started to cry . 
+\<NWS\> the dog ran to the park and saw a big , black cat on the ground . it wanted to pick it up ! but then something strange happened . it was a trap , so he started to cry . 
  
  luckily , a kind lady saw what was wrong . " hello , little bird ! " he said . " don ' t worry , it will don ' t be seen " . 
  
@@ -205,7 +210,7 @@ prompts = ["One day I was sitting on a bench", "Once upon a time, there was a li
  from then on , she would take to
 
 Il modello genera in maniera autoregressiva la prossima parola da inserire al rispettivo input, selezionando le top_k parole (in questi esempi k = 10) tramite la funzione torch.multinomial. 
-Pur non riuscendo a creare storie aventi un filo logico continguo, il modello è riuscito a comprendere le principali associazioni tra le varie parole e la punteggiatura.
+Pur non riuscendo a creare storie aventi un filo logico contiguo, il modello è riuscito a comprendere le principali associazioni tra le varie parole e la punteggiatura.
 
 ## Similarità tra le parole 
 
@@ -235,7 +240,7 @@ with -> ['sheer', 'including', 'carrying', 'near', 'wear', 'lose', 'of', 'in', '
 
 knee -> ['leg', 'toe', 'skin', 'lip', 'throat', 'ankle', 'finger', 'tongue', 'stomach', 'waist']
 
-\<UNK\> -> ['master', '†anna', '†jane', '†max', '†sam', 'guide', '†jack', '†tommy', '†mom', '†sarah']
+\<UNK\> (trigonometria, non presente nel vocabolario del modello) -> ['master', '†anna', '†jane', '†max', '†sam', 'guide', '†jack', '†tommy', '†mom', '†sarah'] 
 
 Il risultato mostra la capacità del modello nel riuscire a comprendere la similarità tra le diverse parole del vocabolario, modellando i vari vettori contenuti nell'embedding table.
 
